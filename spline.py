@@ -4,7 +4,7 @@ import numpy as np
 from patsy import dmatrix
 
 EMULATOR_N_TIMESTEPS = 200
-EMULATOR_PRESSURE_SPLINE_BASE = 1.6  # tweak in UI
+EMULATOR_PRESSURE_SPLINE_BASE = 10  # tweak in UI
 
 
 def generate_interior_knots_logspaced(

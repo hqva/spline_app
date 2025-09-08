@@ -167,7 +167,7 @@ def plot_waveforms(
     fig.update_layout(
         height=height,  # <- was 420 fixed
         margin=dict(l=10, r=10, t=30, b=10),
-        xaxis_title="time (normalised)",
+        xaxis_title="time",
         yaxis_title="amplitude",
         legend=dict(
             orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0
@@ -219,7 +219,7 @@ include_intercept = st.sidebar.selectbox(
 
 st.sidebar.header("Sampling")
 n_samples = st.sidebar.number_input(
-    "Samples", min_value=0, max_value=2000, value=10, step=10
+    "Samples", min_value=0, max_value=1000, value=20, step=5
 )
 seed = st.sidebar.number_input(
     "Random seed", min_value=0, max_value=10_000_000, value=42, step=1
@@ -250,7 +250,7 @@ left, right = st.columns([1.1, 1.9])
 with left:
     st.subheader("Coefficients")
     # quick σ all
-    sigma_all = st.slider("Set all σ", 0.0, 2.0, 0.0, 0.01)
+    sigma_all = st.slider("Set all σ", 0.0, 0.5, 0.0, 0.01)
     if sigma_all is not None:
         st.session_state.sigma[:] = sigma_all
 
@@ -259,17 +259,12 @@ with left:
         c1, c2 = st.columns(2)
         with c1:
             st.session_state.mu[i] = st.slider(
-                f"μ[{i}]", -5.0, 5.0, float(st.session_state.mu[i]), 0.01
+                f"μ[{i}]", -2.0, 2.0, float(st.session_state.mu[i]), 0.01
             )
         with c2:
             st.session_state.sigma[i] = st.slider(
-                f"σ[{i}]", 0.0, 2.0, float(st.session_state.sigma[i]), 0.01
+                f"σ[{i}]", 0.0, 0.5, float(st.session_state.sigma[i]), 0.01
             )
-
-    st.plotly_chart(
-        plot_coefficients(st.session_state.mu, st.session_state.sigma),
-        use_container_width=True,
-    )
 
 with right:
     st.subheader("Draw waveform → Fit coefficients")
@@ -331,9 +326,9 @@ with right:
         for i in range(overlay_n):
             curves.append(samples[i])
             names.append(f"s{i}")
-            opac.append(0.12)
+            opac.append(0.24)
 
-    fig = plot_waveforms(t, curves, names=names, opacity=opac)
+    fig = plot_waveforms(t, curves, names=names, opacity=opac, height=750)
 
     # evaluate the mean waveform at the knot positions
     y_mu_at_knots = np.interp(knot_pos, t, y_mu)
@@ -351,3 +346,8 @@ with right:
     )
 
     st.plotly_chart(fig, use_container_width=True)
+
+    st.plotly_chart(
+        plot_coefficients(st.session_state.mu, st.session_state.sigma),
+        use_container_width=True,
+    )
