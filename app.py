@@ -13,7 +13,9 @@ from spline import (
     fit_coefficients,
     reconstruct_waveform,
     sample_waveforms,
+    generate_interior_knots_logspaced,
 )
+
 
 st.set_page_config(page_title="Spline Basis ↔ Waveform", layout="wide")
 
@@ -146,7 +148,9 @@ def vector_or_raster_to_waveform(canvas_result, n=EMULATOR_N_TIMESTEPS):
     return y
 
 
-def plot_waveforms(time, curves, names=None, mode="lines", opacity=1.0):
+def plot_waveforms(
+    time, curves, names=None, mode="lines", opacity=1.0, height=420
+):
     fig = go.Figure()
     for i, y in enumerate(curves):
         fig.add_trace(
@@ -161,7 +165,7 @@ def plot_waveforms(time, curves, names=None, mode="lines", opacity=1.0):
             )
         )
     fig.update_layout(
-        height=420,
+        height=height,  # <- was 420 fixed
         margin=dict(l=10, r=10, t=30, b=10),
         xaxis_title="time (normalised)",
         yaxis_title="amplitude",
@@ -205,7 +209,7 @@ n_knots = st.sidebar.number_input(
 base = st.sidebar.number_input(
     "log-spacing base",
     min_value=1.1,
-    max_value=3.0,
+    max_value=10.0,
     value=float(EMULATOR_PRESSURE_SPLINE_BASE),
     step=0.1,
 )
@@ -227,6 +231,12 @@ X = generate_spline_dmatrix(
 )
 n_coeff = X.shape[1]
 t = time_axis()
+
+# positions of knots along the time axis (include start/end for context)
+_interior = generate_interior_knots_logspaced(
+    n_knots=n_knots, base=base, time=t
+)
+knot_pos = np.concatenate(([t[0]], _interior, [t[-1]]))  # shape (n_knots,)
 
 # ---- session init ----
 if "mu" not in st.session_state or st.session_state.mu.size != n_coeff:
@@ -263,35 +273,44 @@ with left:
 
 with right:
     st.subheader("Draw waveform → Fit coefficients")
-    stroke_width = st.slider("Stroke width", 1, 10, 3)
-    canvas = st_canvas(
-        fill_color="rgba(0,0,0,0)",
-        stroke_width=int(stroke_width),
-        stroke_color="#1f77b4",
-        background_color="#ffffff",
-        update_streamlit=True,
-        display_toolbar=True,
-        height=220,
-        width=700,
-        drawing_mode="freedraw",
-        key="canvas_one",
-    )
 
-    c1, c2 = st.columns([1, 1])
-    with c1:
+    # two side-by-side areas: drawing (left) and tiny preview (right)
+    draw_col, prev_col = st.columns([1.6, 1.0])
+
+    with draw_col:
+        canvas = st_canvas(
+            fill_color="rgba(0,0,0,0)",
+            stroke_width=5,
+            stroke_color="#1f77b4",
+            background_color="#ffffff",
+            update_streamlit=True,
+            display_toolbar=True,
+            height=220,
+            width=700,
+            drawing_mode="freedraw",
+            key="canvas_one",
+        )
+
+    with prev_col:
+        y_draw = vector_or_raster_to_waveform(canvas, n=EMULATOR_N_TIMESTEPS)
+        if y_draw is not None:
+            st.markdown("Preview")
+            st.plotly_chart(
+                plot_waveforms(t, [y_draw], names=["Drawn"], height=160),
+                use_container_width=True,
+            )
+        else:
+            y_draw = None
+
+    # ⬇️ buttons placed at the SAME nesting level as draw_col/prev_col
+    btn_col1, btn_col2 = st.columns([1, 1])
+    with btn_col1:
         fit_btn = st.button("Fit μ from drawing")
-    with c2:
+    with btn_col2:
         clear_btn = st.button("Clear drawing")
 
     if clear_btn:
         st.rerun()
-
-    y_draw = vector_or_raster_to_waveform(canvas, n=EMULATOR_N_TIMESTEPS)
-    if y_draw is not None:
-        st.plotly_chart(
-            plot_waveforms(t, [y_draw], names=["Drawn"]),
-            use_container_width=True,
-        )
 
     if fit_btn and y_draw is not None:
         st.session_state.mu = fit_coefficients(X, y_draw)
@@ -314,8 +333,21 @@ with right:
             names.append(f"s{i}")
             opac.append(0.12)
 
-    st.subheader("Synthesised waveforms")
-    st.plotly_chart(
-        plot_waveforms(t, curves, names=names, opacity=opac),
-        use_container_width=True,
+    fig = plot_waveforms(t, curves, names=names, opacity=opac)
+
+    # evaluate the mean waveform at the knot positions
+    y_mu_at_knots = np.interp(knot_pos, t, y_mu)
+
+    # overlay knot markers (open circles so they’re visible over lines)
+    fig.add_trace(
+        go.Scatter(
+            x=knot_pos,
+            y=y_mu_at_knots,
+            mode="markers",
+            name="spline knots",
+            marker=dict(size=8, symbol="circle-open"),
+            hovertemplate="t=%{x:.3f}<br>y=%{y:.3f}<extra></extra>",
+        )
     )
+
+    st.plotly_chart(fig, use_container_width=True)
