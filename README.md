@@ -1,6 +1,6 @@
 # Spline Basis ↔ Waveform Playground
 
-A tiny app to explore how natural cubic spline coefficients map to output waveforms, compare two hand-drawn waveforms via least-squares fits, and visualise uncertainty by sampling coefficients.
+chatgpt-coded app to explore how natural cubic spline coefficients map to output waveforms and visualise uncertainty by in spline domain. 
 
 ## Quickstart (local)
 
@@ -8,3 +8,9 @@ A tiny app to explore how natural cubic spline coefficients map to output wavefo
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 streamlit run app.py
+```
+
+## Hosted
+
+currently hosted at http://spline.streamlit.app
+
