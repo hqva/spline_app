@@ -17,7 +17,7 @@ from spline import (
 )
 
 
-st.set_page_config(page_title="Spline Basis ↔ Waveform", layout="wide")
+st.set_page_config(page_title="Splines to Waveform", layout="wide")
 
 
 # ---- helpers ----
@@ -28,7 +28,6 @@ def time_axis(n=EMULATOR_N_TIMESTEPS) -> np.ndarray:
 def _collapse_strokes_to_series(
     json_data, width: int, height: int, n=EMULATOR_N_TIMESTEPS
 ):
-    """Use stroke vectors not raster: robust with drawable-canvas."""
     if not json_data or "objects" not in json_data:
         return None
     xs = [[] for _ in range(width)]
@@ -164,8 +163,10 @@ def plot_waveforms(
                 else opacity[i],
             )
         )
+        fig.update_yaxes(range=[-3.0, 3.0])
+
     fig.update_layout(
-        height=height,  # <- was 420 fixed
+        height=height,
         margin=dict(l=10, r=10, t=30, b=10),
         xaxis_title="time",
         yaxis_title="amplitude",
@@ -179,7 +180,7 @@ def plot_waveforms(
 def plot_coefficients(mu, sigma=None):
     idx = np.arange(mu.size)
     fig = go.Figure()
-    fig.add_trace(go.Bar(x=idx, y=mu, name="μ"))
+    fig.add_trace(go.Scatter(x=idx, y=mu, name="μ"))
     if sigma is not None:
         fig.add_trace(
             go.Scatter(
@@ -191,6 +192,8 @@ def plot_coefficients(mu, sigma=None):
                 opacity=0.25,
             )
         )
+    fig.update_yaxes(range=[-2.0, 2.0])
+
     fig.update_layout(
         barmode="overlay",
         height=360,
@@ -248,7 +251,10 @@ if "sigma" not in st.session_state or st.session_state.sigma.size != n_coeff:
 left, right = st.columns([1.1, 1.9])
 
 with left:
+    dc_offset = st.slider("DC offset", -1.0, 1.0, 0.0, 0.01)
+
     st.subheader("Coefficients")
+
     # quick σ all
     sigma_all = st.slider("Set all σ", 0.0, 0.5, 0.0, 0.01)
     if sigma_all is not None:
@@ -267,9 +273,8 @@ with left:
             )
 
 with right:
-    st.subheader("Draw waveform → Fit coefficients")
+    st.subheader("Draw waveform")
 
-    # two side-by-side areas: drawing (left) and tiny preview (right)
     draw_col, prev_col = st.columns([1.6, 1.0])
 
     with draw_col:
@@ -289,26 +294,19 @@ with right:
     with prev_col:
         y_draw = vector_or_raster_to_waveform(canvas, n=EMULATOR_N_TIMESTEPS)
         if y_draw is not None:
-            st.markdown("Preview")
-            st.plotly_chart(
-                plot_waveforms(t, [y_draw], names=["Drawn"], height=160),
-                use_container_width=True,
+            y_target = y_draw + dc_offset
+            # st.markdown("Preview")
+            fig_preview = plot_waveforms(
+                t, [y_target], names=["Target"], height=300
             )
+            fig_preview.update_yaxes(range=[-1.5, 2.0])  # <- fixed scale
+            st.plotly_chart(fig_preview, use_container_width=True)
         else:
-            y_draw = None
+            y_target = None
 
-    # ⬇️ buttons placed at the SAME nesting level as draw_col/prev_col
-    btn_col1, btn_col2 = st.columns([1, 1])
-    with btn_col1:
-        fit_btn = st.button("Fit μ from drawing")
-    with btn_col2:
-        clear_btn = st.button("Clear drawing")
-
-    if clear_btn:
-        st.rerun()
-
-    if fit_btn and y_draw is not None:
-        st.session_state.mu = fit_coefficients(X, y_draw)
+    # always fit whenever a drawing + offset exists
+    if y_target is not None:
+        st.session_state.mu = fit_coefficients(X, y_target)
 
     # outputs
     mu = st.session_state.mu
@@ -345,9 +343,9 @@ with right:
         )
     )
 
-    st.plotly_chart(fig, use_container_width=True)
-
     st.plotly_chart(
         plot_coefficients(st.session_state.mu, st.session_state.sigma),
         use_container_width=True,
     )
+
+    st.plotly_chart(fig, use_container_width=True)
