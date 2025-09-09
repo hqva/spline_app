@@ -275,6 +275,8 @@ with left:
 with right:
     st.subheader("Draw waveform")
 
+    auto_fit = st.checkbox("Auto-fit from drawing", value=False)
+
     draw_col, prev_col = st.columns([1.6, 1.0])
 
     with draw_col:
@@ -293,7 +295,7 @@ with right:
 
     with prev_col:
         y_draw = vector_or_raster_to_waveform(canvas, n=EMULATOR_N_TIMESTEPS)
-        if y_draw is not None:
+        if auto_fit and y_draw is not None:
             y_target = y_draw + dc_offset
             # st.markdown("Preview")
             fig_preview = plot_waveforms(
